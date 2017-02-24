@@ -21,14 +21,4 @@ public class Constants {
     public static final String ID_PHOTO_PATH = Environment.getExternalStorageDirectory().getPath();
     public static final String ID_PHOTO_NAME = "id_photo.bmp";
 
-    // 人脸检测最大数
-    public static final int MAX_FACE_NUM        = 5;
-    // 图像、特征临时文件名
-    public static final String strImgFile1 = "face_temp_1.jpg";
-    public static final String strImgFile2 = "face_temp_2.jpg";
-    public static final String strTzFile1  = "face_tz_1.dat";
-    public static final String strTzFile2  = "face_tz_2.dat";
-    // 界面显示图像大小
-    public static final int iImgShowWidth  = 128;
-    public static final int iImgShowHeight = 128;
 }

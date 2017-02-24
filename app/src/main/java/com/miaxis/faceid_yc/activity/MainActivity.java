@@ -1,7 +1,6 @@
 package com.miaxis.faceid_yc.activity;
 
 import android.app.smdt.SmdtManager;
-import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
@@ -9,18 +8,14 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.PixelFormat;
 import android.graphics.PorterDuff;
-import android.graphics.PorterDuffXfermode;
 import android.graphics.Rect;
-import android.graphics.RectF;
 import android.graphics.YuvImage;
 import android.hardware.Camera;
 import android.os.Bundle;
-import android.util.Base64;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
-import android.view.View;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
@@ -29,9 +24,7 @@ import android.widget.Toast;
 
 import com.miaxis.faceid_yc.R;
 import com.miaxis.faceid_yc.app.FaceId_YC_App;
-import com.miaxis.faceid_yc.event.FaceDetectedEvent;
 import com.miaxis.faceid_yc.event.FingerPassEvent;
-import com.miaxis.faceid_yc.event.IdFingerEvent;
 import com.miaxis.faceid_yc.event.InfoEvent;
 import com.miaxis.faceid_yc.event.MoveAwayEvent;
 import com.miaxis.faceid_yc.event.NewIdEvent;
@@ -63,7 +56,6 @@ import cn.cloudwalk.sdk.FaceInfo;
 import static com.miaxis.faceid_yc.app.FaceId_YC_App.feature_len;
 import static com.miaxis.faceid_yc.utils.Constants.ID_PHOTO_NAME;
 import static com.miaxis.faceid_yc.utils.Constants.ID_PHOTO_PATH;
-import static com.miaxis.faceid_yc.utils.Constants.MAX_FACE_NUM;
 
 @ContentView(R.layout.activity_main)
 public class MainActivity extends BaseActivity implements SurfaceHolder.Callback, Camera.PreviewCallback {
@@ -91,11 +83,12 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
     private int svWidth  = 640;
     private int svHeight = 480;
 
-    private static final int PRE_WIDTH          = 160;
-    private static final int PRE_HEIGHT         = 120;
+    private static final int PRE_WIDTH          = 320;
+    private static final int PRE_HEIGHT         = 240;
 
     private float zoomRate = (float) svWidth / (float) PRE_WIDTH;
 
+    private static final int MAX_FACE_NUM       = 5;
     private static final float PASS_SCORE       = 0.71f;        // 比对通过阈值
 
     private static final int PHOTO_SIZE         = 38862;        // 解码后身份证图片长度
@@ -242,7 +235,7 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
     }
 
     /* 同步方法提取人脸特征 */
-    private synchronized byte[] extractFreature(byte[] dataAlign, int iWidth, int iHeight, int iChannel) {
+    private synchronized byte[] extractFeature(byte[] dataAlign, int iWidth, int iHeight, int iChannel) {
         byte[] pFeatureBuf = new byte[feature_len];
         Date d1 = new Date();
         int re = mxAPI.mxFeatureExtract(dataAlign, iWidth, iHeight, iChannel, pFeatureBuf);
@@ -340,6 +333,26 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
         iv_camera_photo.setImageBitmap(BitmapFactory.decodeResource(getResources(), R.drawable.default_photo));
         startWait();
         startFromId = new Date().getTime();
+
+        if (e.isHasFinger()) {
+            finger1 = e.getFinger0();
+            finger2 = e.getFinger1();
+            tv_finger1.setTextColor(getResources().getColor(R.color.dark));
+            tv_finger1.setBackground(getResources().getDrawable(R.drawable.dark_stroke_bg));
+            tv_finger1.setText(e.getFingerPosition1());
+            tv_finger2.setTextColor(getResources().getColor(R.color.dark));
+            tv_finger2.setBackground(getResources().getDrawable(R.drawable.dark_stroke_bg));
+            tv_finger2.setText(e.getFingerPosition2());
+        } else {
+            finger1 = null;
+            finger2 = null;
+            tv_finger1.setTextColor(getResources().getColor(R.color.dark));
+            tv_finger1.setBackground(getResources().getDrawable(R.drawable.dark_stroke_bg));
+            tv_finger1.setText("指纹一（未注册）");
+            tv_finger2.setTextColor(getResources().getColor(R.color.dark));
+            tv_finger2.setBackground(getResources().getDrawable(R.drawable.dark_stroke_bg));
+            tv_finger2.setText("指纹二（未注册）");
+        }
     }
 
     /* 处理 人脸通过 事件 */
@@ -373,30 +386,6 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
         end = new Date().getTime();
         Log.e("_________","总耗时__________" +(end - start));
         Log.e("_________","读完身份证开始计时， 耗时__________" +(end - startFromId));
-    }
-
-    /* 处理 读到身份证中指纹 事件 */
-    @Subscribe(threadMode = ThreadMode.MAIN)
-    public void onIdFingerEvent(IdFingerEvent e) {
-        if (e.isFlag()) {
-            finger1 = e.getFinger0();
-            finger2 = e.getFinger1();
-            tv_finger1.setTextColor(getResources().getColor(R.color.dark));
-            tv_finger1.setBackground(getResources().getDrawable(R.drawable.dark_stroke_bg));
-            tv_finger1.setText(e.getFingerPosition1());
-            tv_finger2.setTextColor(getResources().getColor(R.color.dark));
-            tv_finger2.setBackground(getResources().getDrawable(R.drawable.dark_stroke_bg));
-            tv_finger2.setText(e.getFingerPosition2());
-        } else {
-            finger1 = null;
-            finger2 = null;
-            tv_finger1.setTextColor(getResources().getColor(R.color.dark));
-            tv_finger1.setBackground(getResources().getDrawable(R.drawable.dark_stroke_bg));
-            tv_finger1.setText("指纹一（未注册）");
-            tv_finger2.setTextColor(getResources().getColor(R.color.dark));
-            tv_finger2.setBackground(getResources().getDrawable(R.drawable.dark_stroke_bg));
-            tv_finger2.setText("指纹二（未注册）");
-        }
     }
 
     /* 处理 指纹通过 事件 */
@@ -562,7 +551,7 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
                     continue;
                 }
                 detectFlag = false;
-                byte[] pFeatureBuf = extractFreature(pFaceBuffer[i].alignedData, pFaceBuffer[i].alignedW, pFaceBuffer[i].alignedH, pFaceBuffer[i].nChannels);
+                byte[] pFeatureBuf = extractFeature(pFaceBuffer[i].alignedData, pFaceBuffer[i].alignedW, pFaceBuffer[i].alignedH, pFaceBuffer[i].nChannels);
                 if (pFeatureBuf == null) {
                     displayInfo(-1, "提取相机人脸特征失败");
                     continue;
@@ -608,32 +597,11 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
         int re = idCardDriver.mxReadCardFullInfo(bCardFullInfo);
         Date d2 = new Date();
         Log.e("___身份证_", "_读全部信息（含指纹）耗时___" + (d2.getTime() - d1.getTime()));
-        if (re != 0) {
-            fingerFlag = false;
-            if (re == -14) {
-                byte[] bCardInfo = new byte[256 + 1024];
-                Date d3 = new Date();
-                int nRet = idCardDriver.mxReadCardInfo(bCardInfo);
-                Date d4 = new Date();
-                Log.e("___身份证_", "_读全部信息（不含指纹）耗时___" + (d4.getTime() - d3.getTime()));
-                if (nRet != 0) {
-                    if (nRet == -100) {
-                        displayInfo(-1, "无设备");
-                    }
-                    else {
-                        displayInfo(-1, "请放置身份证");
-                    }
-                } else {
-                    analysisCardInfo(bCardInfo);
-                    bus.post(new IdFingerEvent(false, null, null));
-                }
-            } else if (re == -100) {
-                displayInfo(-1, "无设备");
-            } else {
-                displayInfo(-1, "读身份证失败");
-            }
-        } else {
-            analysisCardInfo(bCardFullInfo);
+        NewIdEvent newId = null;
+        if (re == 1) {
+            newId = analysisCardInfo(bCardFullInfo);
+        } else if (re == 0) {
+            newId = analysisCardInfo(bCardFullInfo);
             byte[] bFingerData1 = new byte[mFingerDataSize];
             byte[] bFingerData2 = new byte[mFingerDataSize];
             byte[] bFingerData1_B64 = new byte[mFingerDataB64Size];
@@ -646,19 +614,25 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
             }
             idCardDriver.Base64Encode(bFingerData1, mFingerDataSize, bFingerData1_B64, mFingerDataB64Size);
             idCardDriver.Base64Encode(bFingerData2, mFingerDataSize, bFingerData2_B64, mFingerDataB64Size);
-            IdFingerEvent e = new IdFingerEvent(true, bFingerData1_B64,  bFingerData2_B64);
-            e.setFingerPosition1(getFingerPosition(bFingerData1[5]));
-            e.setFingerPosition2(getFingerPosition(bFingerData2[5]));
-            bus.post(e);
+            newId.setHasFinger(true);
+            newId.setFinger0(bFingerData1_B64);
+            newId.setFinger1(bFingerData2_B64);
+            newId.setFingerPosition1(getFingerPosition(bFingerData1[5]));
+            newId.setFingerPosition2(getFingerPosition(bFingerData2[5]));
             fingerFlag = true;
+        } else {
+            displayInfo(-1, "读身份证信息失败 " + re);
         }
+        bus.post(newId);
+        detectFlag = false;
+        getIdPhotoFeature();
     }
 
     /* 解析身份证信息 */
-    private void analysisCardInfo(byte[] bCardInfo) {
+    private NewIdEvent analysisCardInfo(byte[] bCardInfo) {
+        NewIdEvent infoEvent = new NewIdEvent();
         try {
             Date d1 = new Date();
-            NewIdEvent infoEvent = new NewIdEvent();
             byte[] id_Name = new byte[30]; // 姓名
             byte[] id_Sex = new byte[2]; // 性别 1为男 其他为女
             byte[] id_Rev = new byte[4]; // 民族
@@ -747,12 +721,11 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
             }
             Date d2 = new Date();
             Log.e("___身份证_", "_解析耗时___" + (d2.getTime() - d1.getTime()));
-            bus.post(infoEvent);
-            detectFlag = false;
-            getIdPhotoFeature();
+
         } catch (Exception e) {
             displayInfo(-1, "身份证信息解析错误");
         }
+        return infoEvent;
     }
 
     /* 获取指位信息 */
@@ -831,7 +804,7 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
             return;
         }
         /** 提取特征 */
-        idFaceFeature = extractFreature(pFaceBuffer[0].alignedData,
+        idFaceFeature = extractFeature(pFaceBuffer[0].alignedData,
                 pFaceBuffer[0].alignedW, pFaceBuffer[0].alignedH,
                 pFaceBuffer[0].nChannels);
         if (re != 0 || idFaceFeature == null) {

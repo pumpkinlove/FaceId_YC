@@ -18,7 +18,7 @@ public class NewIdEvent {
     private String validTime;
     private Bitmap bitmap;
 
-    private boolean flag;
+    private boolean hasFinger;//是否有指纹
 
     private String fingerPosition1;
     private String fingerPosition2;
@@ -106,12 +106,12 @@ public class NewIdEvent {
         this.fingerPosition1 = fingerPosition1;
     }
 
-    public boolean isFlag() {
-        return flag;
+    public boolean isHasFinger() {
+        return hasFinger;
     }
 
-    public void setFlag(boolean flag) {
-        this.flag = flag;
+    public void setHasFinger(boolean hasFinger) {
+        this.hasFinger = hasFinger;
     }
 
     public byte[] getFinger0() {
