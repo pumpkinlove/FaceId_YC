@@ -242,7 +242,7 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
     }
 
     /* 同步方法提取人脸特征 */
-    private byte[] extractFreature(byte[] dataAlign, int iWidth, int iHeight, int iChannel) {
+    private synchronized byte[] extractFreature(byte[] dataAlign, int iWidth, int iHeight, int iChannel) {
         byte[] pFeatureBuf = new byte[feature_len];
         Date d1 = new Date();
         int re = mxAPI.mxFeatureExtract(dataAlign, iWidth, iHeight, iChannel, pFeatureBuf);
@@ -338,7 +338,7 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
         tv_id_cardno.   setText(e.getIdNum());
         iv_id_photo.    setImageBitmap(e.getBitmap());
         iv_camera_photo.setImageBitmap(BitmapFactory.decodeResource(getResources(), R.drawable.default_photo));
-//        startWait();
+        startWait();
         startFromId = new Date().getTime();
     }
 

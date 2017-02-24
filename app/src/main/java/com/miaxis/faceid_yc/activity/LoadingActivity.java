@@ -25,6 +25,7 @@ public class LoadingActivity extends BaseActivity {
                 try {
                     Thread.sleep(2000);
                     startActivity(new Intent(LoadingActivity.this, MainActivity.class));
+                    finish();
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
