@@ -39,4 +39,14 @@ public class CommonUtil {
         out.flush();
         out.close();
     }
+
+    public static void ImrotateLevel_raw(byte[] rawBuf, int imgX, int imgY) {
+        for(int i = 0; i < imgY; ++i) {
+            for(int j = 0; j < imgX >> 1; ++j) {
+                byte tmp = rawBuf[i * imgX + j];
+                rawBuf[i * imgX + j] = rawBuf[i * imgX + (imgX - 1 - j)];
+                rawBuf[i * imgX + (imgX - 1 - j)] = tmp;
+            }
+        }
+    }
 }

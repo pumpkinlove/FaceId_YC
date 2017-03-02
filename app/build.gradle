@@ -34,6 +34,7 @@ dependencies {
     compile 'org.xutils:xutils:3.3.36'
     compile files('src/main/libs/CWFaceAPI.jar')
     compile files('src/main/libs/MXFingerDriver.jar')
+    compile files('src/main/libs/MXFaceDetectAPI.jar')
 }
 
 apt {

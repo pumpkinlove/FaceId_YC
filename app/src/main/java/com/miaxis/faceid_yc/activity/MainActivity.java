@@ -38,6 +38,7 @@ import org.greenrobot.eventbus.ThreadMode;
 import org.xutils.view.annotation.ContentView;
 import org.xutils.view.annotation.ViewInject;
 import org.xutils.x;
+import org.zz.faceapi.DataDecode;
 import org.zz.faceapi.MXFaceAPI;
 import org.zz.idcard_hid_driver.IdCardDriver;
 import org.zz.jni.mxImageLoad;
@@ -74,14 +75,13 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
     @ViewInject(R.id.sv_camera)         private SurfaceView sv_camera;
     @ViewInject(R.id.sv_rect)           private SurfaceView sv_rect;
 
-
     @ViewInject(R.id.tv_finger1)        private TextView tv_finger1;
     @ViewInject(R.id.tv_finger2)        private TextView tv_finger2;
 
     @ViewInject(R.id.fl_main)           private FrameLayout fl_main;
 
-    private int svWidth  = 640;
-    private int svHeight = 480;
+    private int svWidth                         = 640;
+    private int svHeight                        = 480;
 
     private static final int PRE_WIDTH          = 320;
     private static final int PRE_HEIGHT         = 240;
@@ -90,6 +90,7 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
 
     private static final int MAX_FACE_NUM       = 5;
     private static final float PASS_SCORE       = 0.71f;        // 比对通过阈值
+    private static final int WAIT_TIME          = 10000;
 
     private static final int PHOTO_SIZE         = 38862;        // 解码后身份证图片长度
     private static final int mFingerDataSize    = 512;          // 指纹数据长度
@@ -123,7 +124,7 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
     private SurfaceHolder mHolder;
     private SurfaceHolder rectHolder;
 
-    private ExecutorService executorService = Executors.newSingleThreadExecutor();//        用来进行特征提取的线程池
+    private ExecutorService executorService     = Executors.newSingleThreadExecutor();//        用来进行特征提取的线程池
     private Thread waitThread;
 
     private Bitmap bmpIdCard;                   // 二代证照片
@@ -150,6 +151,9 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
     }
 
     private void initData() {
+
+
+
         mxAPI = FaceId_YC_App.mxAPI;
         smdtManager = SmdtManager.create(this);
         bus = EventBus.getDefault();
@@ -230,27 +234,18 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
 
     /* 显示提示信息 */
     private void displayInfo(int code, String info) {
-        Log.e("-------", info);
+        Log.e("______", info);
         bus.post(new InfoEvent(code, info));
-    }
-
-    /* 同步方法提取人脸特征 */
-    private synchronized byte[] extractFeature(byte[] dataAlign, int iWidth, int iHeight, int iChannel) {
-        byte[] pFeatureBuf = new byte[feature_len];
-        Date d1 = new Date();
-        int re = mxAPI.mxFeatureExtract(dataAlign, iWidth, iHeight, iChannel, pFeatureBuf);
-        Date d2 = new Date();
-        Log.e("_____", "___提取特征耗时_" + (d2.getTime() - d1.getTime()));
-        if (re == 0) {
-            return pFeatureBuf;
-        } else {
-            return null;
-        }
     }
 
     /** SurfaceView 预览回调 */
     @Override
     public void onPreviewFrame(byte[] data, Camera camera) {
+        try {
+            Thread.sleep(50);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
         if (!detectFlag) {
             return;
         }
@@ -263,9 +258,7 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
         for (int i = 0; i < MAX_FACE_NUM; i++) {
             pFaceBuffer[i] = new FaceInfo();
         }
-//        Date d1 = new Date();
-        int re = mxAPI.mxDetectFaceYUV(data, PRE_WIDTH, PRE_HEIGHT, pFaceNum, pFaceBuffer);
-//        Log.e("检测人脸___", "人脸数：" + pFaceNum[0] + "___耗时" + (new Date().getTime() - d1.getTime()));
+        int re = detectFaceYUV(data, PRE_WIDTH, PRE_HEIGHT, pFaceNum, pFaceBuffer);
         canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR);
         if (re == 0 && pFaceNum[0] > 0) {
             drawFaceRect(pFaceBuffer, canvas, pFaceNum[0]);
@@ -277,8 +270,7 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
                 }
             }
         }
-        if (canvas != null)
-            rectHolder.unlockCanvasAndPost(canvas);
+        rectHolder.unlockCanvasAndPost(canvas);
     }
 
     @Override
@@ -343,9 +335,11 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
             tv_finger2.setTextColor(getResources().getColor(R.color.dark));
             tv_finger2.setBackground(getResources().getDrawable(R.drawable.dark_stroke_bg));
             tv_finger2.setText(e.getFingerPosition2());
+            fingerFlag = true;
         } else {
             finger1 = null;
             finger2 = null;
+            fingerFlag = false;
             tv_finger1.setTextColor(getResources().getColor(R.color.dark));
             tv_finger1.setBackground(getResources().getDrawable(R.drawable.dark_stroke_bg));
             tv_finger1.setText("指纹一（未注册）");
@@ -424,12 +418,13 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
         iv_camera_photo.setImageBitmap(BitmapFactory.decodeResource(getResources(), R.drawable.default_photo));
         iv_id_photo.setImageBitmap(BitmapFactory.decodeResource(getResources(), R.drawable.default_photo));
         cardId = null;
+        idFaceFeature = null;
         verifyFlag = false;
         fingerFlag = false;
     }
 
     /** 线程 */
-    /* 循环读身份证id线程 */
+    /* 线程 循环读身份证id */
     private class ReadIdRunnable implements Runnable {
         @Override
         public void run() {
@@ -445,7 +440,7 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
                     if (re == 0) {
                         smdtManager.smdtSetExtrnalGpioValue(3, true);           //开灯
                         if (!Arrays.equals(bCardId, cardId)) {
-                            Log.e("___身份证_", "_读id耗时___" + (d2.getTime() - d1.getTime()));
+                            Log.e("身份证_", "_读id耗时___" + (d2.getTime() - d1.getTime()));
                             start = d1.getTime();
                             cardId = bCardId;
                             readCardInfo();
@@ -544,33 +539,34 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
             int re;
             float[] fScore = new float[1];
             for (int i=0; i<pFaceNum[0]; i++) {
-                if (!verifyFlag) {
-                    break;
-                }
                 if (pFaceBuffer[i].width == 0) {
                     continue;
                 }
-                detectFlag = false;
+                if (!verifyFlag) {
+                    break;
+                }
                 byte[] pFeatureBuf = extractFeature(pFaceBuffer[i].alignedData, pFaceBuffer[i].alignedW, pFaceBuffer[i].alignedH, pFaceBuffer[i].nChannels);
                 if (pFeatureBuf == null) {
                     displayInfo(-1, "提取相机人脸特征失败");
                     continue;
                 }
                 Date d1 = new Date();
+                if (idFaceFeature == null || idFaceFeature.length <= 0) {
+                    break;
+                }
                 re = mxAPI.mxFeatureMatch(idFaceFeature, pFeatureBuf, fScore);
                 Date d2 = new Date();
-                Log.e("_____摄像头_", "_比对耗时__" + (d2.getTime() - d1.getTime()));
+                Log.e("比对耗时", "___" + (d2.getTime() - d1.getTime()));
                 if (re == 0 && fScore[0] > PASS_SCORE ) {
-                    displayInfo(1, "验证通过 " + fScore[0]);
+                    displayInfo(1, "验证通过");
                     verifyFlag = false;
                     bus.post(new PassEvent(pFaceBuffer[i], pCameraData));
                     break;
-                } else {
-                    displayInfo(-1, "比对失败_ " + re + " _" + fScore[0]);
+//                } else {
+//                    displayInfo(-1, "比对失败_ " + re + " _" + fScore[0]);
                 }
             }
             isMatchWorking = false;
-            detectFlag = true;
         }
     }
 
@@ -580,9 +576,10 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
         @Override
         public void run() {
             try {
-                Thread.sleep(10000);
-                displayInfo(-1, "比对失败, 请重新放置身份证");
+                Thread.sleep(WAIT_TIME);
+                displayInfo(-1, "比对失败, 请拿开身份证");
                 verifyFlag = false;
+                fingerFlag = false;
 //                bus.post(new MoveAwayEvent());
             } catch (InterruptedException e) {
             }
@@ -596,7 +593,7 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
         Date d1 = new Date();
         int re = idCardDriver.mxReadCardFullInfo(bCardFullInfo);
         Date d2 = new Date();
-        Log.e("___身份证_", "_读全部信息（含指纹）耗时___" + (d2.getTime() - d1.getTime()));
+        Log.e("身份证_", "_读全部信息（含指纹）耗时___" + (d2.getTime() - d1.getTime()));
         NewIdEvent newId = null;
         if (re == 1) {
             newId = analysisCardInfo(bCardFullInfo);
@@ -619,12 +616,11 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
             newId.setFinger1(bFingerData2_B64);
             newId.setFingerPosition1(getFingerPosition(bFingerData1[5]));
             newId.setFingerPosition2(getFingerPosition(bFingerData2[5]));
-            fingerFlag = true;
         } else {
             displayInfo(-1, "读身份证信息失败 " + re);
         }
         bus.post(newId);
-        detectFlag = false;
+        displayInfo(0,"请正对摄像头");
         getIdPhotoFeature();
     }
 
@@ -720,7 +716,7 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
                 infoEvent.setBitmap(bmpIdCard);
             }
             Date d2 = new Date();
-            Log.e("___身份证_", "_解析耗时___" + (d2.getTime() - d1.getTime()));
+            Log.e("身份证_", "_解析耗时___" + (d2.getTime() - d1.getTime()));
 
         } catch (Exception e) {
             displayInfo(-1, "身份证信息解析错误");
@@ -788,7 +784,7 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
             return;
         }
         Date d2 = new Date();
-        Log.e("_____身份证_", "_加载图像耗时__" + (d2.getTime() - d1.getTime()));
+        Log.e("身份证_", "_加载图像耗时__" + (d2.getTime() - d1.getTime()));
         /** 检测人脸 */
         int[] pFaceNum = new int[1];
         pFaceNum[0] = 1;                //身份证照片只可能检测到一张人脸
@@ -796,9 +792,7 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
         pFaceBuffer[0] = new FaceInfo();
         int iX = oX[0];
         int iY = oY[0];
-        re = mxAPI.mxDetectFace(pGrayBuff, iX, iY, pFaceNum, pFaceBuffer);
-        Date d3 = new Date();
-        Log.e("_____身份证_", "_检测人脸耗时__" + (d3.getTime() - d2.getTime()));
+        re = detectFace(pGrayBuff, iX, iY, pFaceNum, pFaceBuffer);
         if (re != 0) {
             displayInfo(-1, "身份证照片未检测到人脸");
             return;
@@ -812,7 +806,6 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
             return;
         }
         verifyFlag = true;
-        detectFlag = true;
     }
 
     /** 按两次返回退出程序 */
@@ -848,8 +841,7 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
     }
 
     /** 画线 */
-    private void canvasDrawLine(Canvas canvas,int iNum,float[] startArrayX, float[] startArrayY,
-                                float[] stopArrayX, float[] stopArrayY) {
+    private void canvasDrawLine(Canvas canvas, int iNum, float[] startArrayX, float[] startArrayY, float[] stopArrayX, float[] stopArrayY) {
         try {
             int iLen  = 50;
             Paint mPaint = new Paint();
@@ -878,4 +870,44 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
         }
         catch(Exception e){}
     }
+
+    /* 检测人脸 视频流 */
+    private int detectFaceYUV(byte[] pYUVImgBuf, int nImgWidth, int nImgHeight, int[] pFaceNum, FaceInfo[] pFaceBuffer) {
+        byte[] pGrayImage = new byte[nImgWidth * nImgHeight];
+        DataDecode.decodeYUV420SP(pGrayImage, pYUVImgBuf, nImgWidth, nImgHeight);
+        CommonUtil.ImrotateLevel_raw(pGrayImage, nImgWidth, nImgHeight);
+        return detectFace(pGrayImage, nImgWidth, nImgHeight, pFaceNum, pFaceBuffer);
+    }
+
+    private Byte lock1 = 1;
+    private Byte lock2 = 2;
+
+    /* 检测人脸 */
+    private int detectFace(byte[] pGrayImage, int nImgWidth, int nImgHeight, int[] pFaceNum, FaceInfo[] pFaceBuffer) {
+        synchronized (lock1) {
+            long t1 = new Date().getTime();
+            int re = mxAPI.mxDetectFace(pGrayImage, nImgWidth, nImgHeight, pFaceNum, pFaceBuffer);
+            Log.e("检测人脸，耗时：", "" + (new Date().getTime() - t1));
+            return re;
+        }
+    }
+
+    /* 提取人脸特征 */
+    private byte[] extractFeature(byte[] dataAlign, int iWidth, int iHeight, int iChannel) {
+        synchronized (lock2) {
+            byte[] pFeatureBuf = new byte[feature_len];
+            Date d1 = new Date();
+            detectFlag = false;
+            int re = mxAPI.mxFeatureExtract(dataAlign, iWidth, iHeight, iChannel, pFeatureBuf);
+            detectFlag = true;
+            Date d2 = new Date();
+            Log.e("提取特征", "___耗时_" + (d2.getTime() - d1.getTime()));
+            if (re == 0) {
+                return pFeatureBuf;
+            } else {
+                return null;
+            }
+        }
+    }
+
 }

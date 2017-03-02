@@ -71,7 +71,7 @@ public class FaceId_YC_App extends Application {
     @Override
     public void onTerminate() {
         super.onTerminate();
-        smdtManager.smdtSetExtrnalGpioValue(2, false);   //摄像头上电
+        smdtManager.smdtSetExtrnalGpioValue(2, false);   //摄像头关电
         bus.unregister(this);
     }
 
