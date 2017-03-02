@@ -151,9 +151,6 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
     }
 
     private void initData() {
-
-
-
         mxAPI = FaceId_YC_App.mxAPI;
         smdtManager = SmdtManager.create(this);
         bus = EventBus.getDefault();
@@ -218,7 +215,7 @@ public class MainActivity extends BaseActivity implements SurfaceHolder.Callback
             mCamera.setParameters(p);
             mCamera.setPreviewCallback(this);
             mCamera.setPreviewDisplay(mHolder);
-            mCamera.startPreview();
+//            mCamera.startPreview();
         } catch (Exception e) {
             displayInfo(-1, "打开摄像头失败");
         }
